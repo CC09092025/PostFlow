@@ -1,0 +1,98 @@
+﻿@page "/"
+@using PostFlow.Services
+@using PostFlow.Data
+@using PostFlow.Models
+@inject JsonPlaceholderService JsonPlaceholderService
+@inject PostRepository PostRepository
+
+<PageTitle>PostFlow</PageTitle>
+
+<div>
+    <h1>PostFlow</h1>
+
+    <button @onclick="FetchAndSaveData" disabled="@isLoading">
+        @if (isLoading)
+        {
+            <span>Loading...</span>
+        }
+        else
+        {
+            <span>Fetch and Save Data</span>
+        }
+    </button>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div>
+            @statusMessage
+        </div>
+    }
+
+    @if (posts?.Any() == true)
+    {
+        <div>
+            <h3>Posts from Database: @posts.Count</h3>
+            @foreach (var post in posts)
+            {
+                <div>
+                    <h4>@post.Title</h4>
+                    <p>@post.Body</p>
+                    <small>ID: @post.Id | User: @post.UserId</small>
+                </div>
+            }
+        </div>
+    }
+    else if (posts?.Any() == false)
+    {
+        <div>
+            No posts found. Click the button.
+        </div>
+    }
+</div>
+
+@code {
+    private List<Post>? posts;
+    private bool isLoading = false;
+    private string statusMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPostsFromDatabase();
+    }
+
+    private async Task FetchAndSaveData()
+    {
+        isLoading = true;
+        statusMessage = "Fetching from API...";
+        StateHasChanged();
+
+        try
+        {
+            var apiPosts = await JsonPlaceholderService.GetPostsAsync();
+            statusMessage = $"Got {apiPosts.Count} posts. Saving...";
+            StateHasChanged();
+
+            var savedCount = await PostRepository.SaveAllPostsAsync(apiPosts);
+            statusMessage = $"Saved {savedCount} posts. Loading...";
+            StateHasChanged();
+
+            await LoadPostsFromDatabase();
+
+            statusMessage = $"Done! Loaded {posts?.Count ?? 0} posts from database.";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadPostsFromDatabase()
+    {
+        posts = await PostRepository.GetAllPostsAsync();
+    }
+}
